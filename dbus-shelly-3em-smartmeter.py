@@ -81,7 +81,7 @@ class DbusShelly3emService:
     gobject.timeout_add(self._getSignOfLifeInterval()*60*1000, self._signOfLife)
  
   def _getShellySerial(self):
-    meter_data = self._getShellyData()  
+    meter_data = self._getShellyData(0)  
     
     if not meter_data['mac']:
         raise ValueError("Response does not contain 'mac' attribute")
@@ -121,21 +121,26 @@ class DbusShelly3emService:
     accessType = config['DEFAULT']['AccessType']
     
     if accessType == 'OnPremise': 
-        URL = "http://%s:%s@%s/status" % (config['ONPREMISE']['Username'], config['ONPREMISE']['Password'], config['ONPREMISE']['Host'])
-        URL = URL.replace(":@", "")
+        
+        URL0 = "http://%s:%s@%s/status" % (config['ONPREMISE']['Username'], config['ONPREMISE']['Password'], config['ONPREMISE']['Hostst'])
+        URL0 = URL0.replace(":@", "")
+        URL1 = "http://%s:%s@%s/status" % (config['ONPREMISE']['Username'], config['ONPREMISE']['Password'], config['ONPREMISE']['Hostnd'])
+        URL1 = URL1.replace(":@", "")
+        URL = [URL0, URL1]
+        logging.info(str(URL))
     else:
         raise ValueError("AccessType %s is not supported" % (config['DEFAULT']['AccessType']))
     
     return URL
     
  
-  def _getShellyData(self):
+  def _getShellyData(self, hostNumber):
     URL = self._getShellyStatusUrl()
-    meter_r = requests.get(url = URL, timeout=5)
-    
+    meter_r = requests.get(url = URL[hostNumber], timeout=5)
+
     # check for response
     if not meter_r:
-        raise ConnectionError("No response from Shelly 3EM - %s" % (URL))
+        raise ConnectionError("No response from Shelly 3EM - %s" % (URL[hostNumber]))
     
     meter_data = meter_r.json()     
     
@@ -157,8 +162,11 @@ class DbusShelly3emService:
   def _update(self):   
     try:
       #get data from Shelly 3em
-      meter_data = self._getShellyData()
+      meter_data = self._getShellyData(0)
+      meter_data1 = self._getShellyData(1)
       config = self._getConfig()
+      logging.info("Host0: " + meter_data)
+      logging.info("Host1: " + meter_data1)
 
       try:
         remapL1 = int(config['ONPREMISE']['L1Position'])
@@ -171,22 +179,23 @@ class DbusShelly3emService:
         meter_data['emeters'][remapL1-1] = old_l1
        
       #send data to DBus
-      self._dbusservice['/Ac/Power'] = meter_data['total_power']
-      self._dbusservice['/Ac/L1/Voltage'] = meter_data['emeters'][0]['voltage']
-      self._dbusservice['/Ac/L2/Voltage'] = meter_data['emeters'][1]['voltage']
-      self._dbusservice['/Ac/L3/Voltage'] = meter_data['emeters'][2]['voltage']
-      self._dbusservice['/Ac/L1/Current'] = meter_data['emeters'][0]['current']
-      self._dbusservice['/Ac/L2/Current'] = meter_data['emeters'][1]['current']
-      self._dbusservice['/Ac/L3/Current'] = meter_data['emeters'][2]['current']
-      self._dbusservice['/Ac/L1/Power'] = meter_data['emeters'][0]['power']
-      self._dbusservice['/Ac/L2/Power'] = meter_data['emeters'][1]['power']
-      self._dbusservice['/Ac/L3/Power'] = meter_data['emeters'][2]['power']
-      self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['emeters'][0]['total']/1000)
-      self._dbusservice['/Ac/L2/Energy/Forward'] = (meter_data['emeters'][1]['total']/1000)
-      self._dbusservice['/Ac/L3/Energy/Forward'] = (meter_data['emeters'][2]['total']/1000)
-      self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['emeters'][0]['total_returned']/1000) 
-      self._dbusservice['/Ac/L2/Energy/Reverse'] = (meter_data['emeters'][1]['total_returned']/1000) 
-      self._dbusservice['/Ac/L3/Energy/Reverse'] = (meter_data['emeters'][2]['total_returned']/1000) 
+      self._dbusservice['/Ac/Power'] = meter_data['total_power'] + meter_data1['total_power']
+      logging.info(str(meter_data['total_power']) + " / " + str(meter_data1['total_power']))
+      self._dbusservice['/Ac/L1/Voltage'] = (meter_data['emeters'][0]['voltage'] + meter_data1['emeters'][0]['voltage'])/2
+      self._dbusservice['/Ac/L2/Voltage'] = (meter_data['emeters'][1]['voltage'] + meter_data1['emeters'][1]['voltage'])/2
+      self._dbusservice['/Ac/L3/Voltage'] = (meter_data['emeters'][2]['voltage'] + meter_data1['emeters'][2]['voltage'])/2
+      self._dbusservice['/Ac/L1/Current'] = meter_data['emeters'][0]['current'] + meter_data1['emeters'][0]['current']
+      self._dbusservice['/Ac/L2/Current'] = meter_data['emeters'][1]['current'] + meter_data1['emeters'][1]['current']
+      self._dbusservice['/Ac/L3/Current'] = meter_data['emeters'][2]['current'] + meter_data1['emeters'][2]['current']
+      self._dbusservice['/Ac/L1/Power'] = meter_data['emeters'][0]['power'] + meter_data1['emeters'][0]['power']
+      self._dbusservice['/Ac/L2/Power'] = meter_data['emeters'][1]['power'] + meter_data1['emeters'][1]['power']
+      self._dbusservice['/Ac/L3/Power'] = meter_data['emeters'][2]['power'] + meter_data1['emeters'][2]['power']
+      self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['emeters'][0]['total']/1000) + (meter_data1['emeters'][0]['total']/1000)
+      self._dbusservice['/Ac/L2/Energy/Forward'] = (meter_data['emeters'][1]['total']/1000) + (meter_data1['emeters'][1]['total']/1000)
+      self._dbusservice['/Ac/L3/Energy/Forward'] = (meter_data['emeters'][2]['total']/1000) + (meter_data1['emeters'][2]['total']/1000)
+      self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['emeters'][0]['total_returned']/1000) + (meter_data1['emeters'][0]['total_returned']/1000)
+      self._dbusservice['/Ac/L2/Energy/Reverse'] = (meter_data['emeters'][1]['total_returned']/1000) + (meter_data1['emeters'][1]['total_returned']/1000)
+      self._dbusservice['/Ac/L3/Energy/Reverse'] = (meter_data['emeters'][2]['total_returned']/1000) + (meter_data1['emeters'][2]['total_returned']/1000)
       
       # Old version
       #self._dbusservice['/Ac/Energy/Forward'] = self._dbusservice['/Ac/L1/Energy/Forward'] + self._dbusservice['/Ac/L2/Energy/Forward'] + self._dbusservice['/Ac/L3/Energy/Forward']
