@@ -1,3 +1,11 @@
+# Changes for this Fork
+I added the possibility to add two Shelly EM3 as Grid Meter. If you install multiple versions of this one, the values dont get updated and calculated correctly as grid meter.
+Here you can specify two grid meters and values are added up correctly but it acts as one grid meter.
+
+
+
+
+
 # dbus-shelly-3em-smartmeter
 Integrate Shelly 3EM smart meter into [Victron Energies Venus OS](https://github.com/victronenergy/venus)
 
